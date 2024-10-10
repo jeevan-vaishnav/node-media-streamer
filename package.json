@@ -2,10 +2,11 @@
   "name": "media-streamer",
   "version": "1.0.0",
   "description": "Love to contribute open source",
-  "main": "index.js",
+  "main": "./src/server.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon index"
+    "start": "nodemon ./src/server --trace-warnings"
   },
   "keywords": [],
   "author": "",
