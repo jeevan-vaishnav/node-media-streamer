@@ -59,12 +59,6 @@ app.get("/video-stream", async (req, res) => {
         "Content-Type": "video/mp4",
       });
       videoStream.pipe(res);
-      setInterval(() => {
-        console.log("parts:" + parts);
-        console.log("end:" + end);
-        console.log("start:" + start);
-        console.log('contentLength: ' + contentLength);
-      },1000);
     } else {
       console.log("No Range requested, sending entire file");
       // 11. If no range is requested, send the entire video file
@@ -83,6 +77,81 @@ app.get("/video-stream", async (req, res) => {
   }
 });
 
+// Serve the audio stream
+app.get("/audio-stream", async (req, res) => {
+    console.log(`Req: ${chalk.green(req)} | Res: ${chalk.blue(res)}`);
+    const audioPath = path.join(__dirname, "../public/audio.mp3");
+    const audioStats = await fsPromises.stat(audioPath);
+    const audioSize = audioStats.size;
+    const range = req.headers.range;
+  
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : audioSize - 1;
+  
+      if (start >= audioSize || end >= audioSize || start > end) {
+        res.writeHead(416, { "Content-Range": `bytes */${audioSize}` });
+        return res.end();
+      }
+  
+      const contentLength = end - start + 1;
+      const audioHandle = await fsPromises.open(audioPath, "r");
+      const audioStream = audioHandle.createReadStream({ start, end });
+  
+      res.writeHead(206, {
+        "Content-Range": `bytes ${start}-${end}/${audioSize}`,
+        "Content-Length": contentLength,
+        "Content-Type": "audio/mpeg",
+      });
+  
+      // Debug: Track progress of audio stream
+      let bytesSent = 0;
+      audioStream.on("data", (chunk) => {
+        bytesSent += chunk.length;
+        console.log(
+          `Sending audio chunk: start=${start}, end=${end}, chunkSize=${chunk.length}, totalBytesSent=${bytesSent}`
+        );
+      });
+  
+      audioStream.on("end", () => {
+        console.log("Audio stream ended");
+      });
+  
+      audioStream.on("error", (error) => {
+        console.error("Error in audio stream:", error);
+      });
+  
+      audioStream.pipe(res);
+    } else {
+      res.writeHead(200, {
+        "Content-Length": audioSize,
+        "Content-Type": "audio/mp3",
+      });
+  
+      const audioHandle = await fsPromises.open(audioPath, "r");
+      const audioStream = audioHandle.createReadStream();
+  
+      let bytesSent = 0;
+      audioStream.on("data", (chunk) => {
+        bytesSent += chunk.length;
+        console.log(
+          `Sending full audio chunk: chunkSize=${chunk.length}, totalBytesSent=${bytesSent}`
+        );
+      });
+  
+      audioStream.on("end", () => {
+        console.log("Full audio stream ended");
+      });
+  
+      audioStream.on("error", (error) => {
+        console.error("Error in full audio stream:", error);
+      });
+  
+      audioStream.pipe(res);
+    }
+  });
+  
 app.listen(port, () => {
   console.log(`${chalk.green(`Server run at http://localhost:${port}`)}`);
 });
